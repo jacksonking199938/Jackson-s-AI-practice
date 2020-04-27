@@ -7,7 +7,9 @@ from mxnet import gluon, init, autograd
 from sklearn.datasets import load_svmlight_file
 #%%
 def load_data():
-    # you can download the dataset from 
+    "'数据预处理'"
+    #你可以在 https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html#a9a 下载数据
+    #需要修改成你的文件路径
     filepath1 = r"D:\ACoder\AllMyLab\MLLab\Lab2\data\a9a_train.txt"
     train_data = load_svmlight_file(filepath1)
     X_train = train_data[0].toarray()
