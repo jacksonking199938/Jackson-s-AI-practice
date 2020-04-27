@@ -23,8 +23,6 @@ def load_data():
     y_test = test_data[1]
 
     # 去不整齐的数据
-    print(X_test.shape)
-    print(X_train.shape)
     if X_train.shape[1] > X_test.shape[1]:
         max_colomn = X_train.shape[1] - 1
         X_train = np.delete(X_train, max_colomn, axis=1)
@@ -40,16 +38,12 @@ def load_data():
         if y_test[j] == -1:
             y_test[j] = 0
 
-    print(X_test.shape)
-    print(X_train.shape)
     # 向Xtain Xtest中粘贴一列1以模拟b
     rows_train = X_train.shape[0]
     rows_test = X_test.shape[0]
     colomn = X_train.shape[1]
     X_train = np.insert(X_train, colomn - 1, np.ones(rows_train), axis=1)
     X_test = np.insert(X_test, colomn - 1, np.ones(rows_test), axis=1)
-    print(X_test.shape)
-    print(X_train.shape)
     return X_train, X_test, y_train, y_test
 
 
@@ -79,15 +73,12 @@ def train(alpha, beta1, beta2, epoches, epsilon, batch_size):
     print(colomn)
     W = np.random.uniform(low=1.0, high=10.0, size=(1, colomn))
     W_pre = np.zeros([1, colomn])
-    gradient = np.zeros([1, colomn])  # 初始化偏导数
     # 训练参数
-    right_num = 0
     losses_val = []
     m = np.zeros([1, colomn])
     v = np.zeros([1, colomn])
     t = 1
     while t <= epoches:
-        right_num = 0
         for x_batch, y_batch in batch_generator(X_train, y_train, batch_size):
             y = sigmoid(np.dot(W, x_batch.transpose()))
             deviation = y - y_batch.reshape(y.shape)
