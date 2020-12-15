@@ -56,7 +56,7 @@ class Seq2SeqDecoder(d2l.Decoder):
         self.rnn = nn.GRU(embed_size + num_hiddens, num_hiddens, num_layers,
                           dropout=dropout)
         self.dense = nn.Linear(num_hiddens, vocab_size)
-
+        
     def init_state(self, enc_outputs, *args):
         return enc_outputs[1]
 
@@ -148,6 +148,7 @@ model = d2l.EncoderDecoder(encoder, decoder)
 train_s2s_ch9(model, train_iter, lr, num_epochs, tgt_vocab, device)
 #%%
 #@save
+
 def predict_s2s_ch9(model, src_sentence, src_vocab, tgt_vocab, num_steps,
                     device):
     """Predict sequences (defined in Chapter 9)."""
@@ -160,22 +161,44 @@ def predict_s2s_ch9(model, src_sentence, src_vocab, tgt_vocab, num_steps,
         torch.tensor(src_tokens, dtype=torch.long, device=device), dim=0)
     enc_outputs = model.encoder(enc_X, enc_valid_len)
     dec_state = model.decoder.init_state(enc_outputs, enc_valid_len)
-    # Add the batch axis
-    dec_X = torch.unsqueeze(torch.tensor(
-        [tgt_vocab['<bos>']], dtype=torch.long, device=device), dim=0)
-    output_seq = []
+
+    output_seqs = []
+    beam_size=5
+    # candidate consists of candidate sequence and its score
+    candidates = []
+    completed_candidates = []
+    for i in range(beam_size):
+        candidates.append([[tgt_vocab['<bos>']],0])
     for _ in range(num_steps):
-        Y, dec_state = model.decoder(dec_X, dec_state)
-        # We use the token with the highest prediction likelihood as the input
-        # of the decoder at the next time step
-        dec_X = Y.argmax(dim=2)
-        pred = dec_X.squeeze(dim=0).type(torch.int32).item()
-        # Once the end-of-sequence token is predicted, the generation of
-        # the output sequence is complete
-        if pred == tgt_vocab['<eos>']:
+        current_candidates = []
+        if len(completed_candidates) >= beam_size:
             break
-        output_seq.append(pred)
-    return ' '.join(tgt_vocab.to_tokens(output_seq))
+        for i in range(len(candidates)):
+            if candidates[i][0][-1] == tgt_vocab['<eos>']:
+                completed_candidates.append(candidates[i])
+                if len(completed_candidates) >= beam_size:
+                    break
+                else:
+                    continue 
+            Y, dec_state = model.decoder(torch.unsqueeze(
+                                        torch.tensor([candidates[i][0][-1]]), dim=0),dec_state)
+            # We use the token with the highest prediction likelihood as the input
+            # of the decoder at the next time step
+            topk = Y.view(-1).topk(k=beam_size,dim=-1)
+            for prob, dec_X in zip(topk[0],topk[1]):
+                current_candidates.append((candidates[i][0]+[dec_X.data.item()],
+                                            candidates[i][1] + math.log(prob)))
+        current_candidates.sort(key = lambda x: -x[1])
+        candidates = current_candidates[:beam_size]
+    lack = beam_size-len(completed_candidates)
+    if lack > 0:
+        for candidate in candidates[:lack]:
+            candidate[0].append(tgt_vocab['<eos>')
+            completed_candidates.append(candidate)
+    for candidate in completed_candidates:
+        output_seqs.append(' '.join(tgt_vocab.to_tokens(candidate[0][1:-1])))
+    
+    return output_seqs
 
 #%%
 def bleu(pred_seq, label_seq,k):
@@ -197,12 +220,16 @@ def bleu(pred_seq, label_seq,k):
 def translate(engs, fras, model, src_vocab, tgt_vocab, num_steps, device):
     """Translate text sequences."""
     for eng, fra in zip(engs, fras):
-        translation = predict_s2s_ch9(
+        translations = predict_s2s_ch9(
             model, eng, src_vocab, tgt_vocab, num_steps, device)
-        print(
-            f'{eng} => {translation}, bleu {bleu(translation, fra, k=2):.3f}')
+        for translation in translations:
+            print(
+                f'{eng} => {translation}, bleu {bleu(translation, fra, k=2):.3f}')
 
 engs = ['go .', "i lost .", 'i\'m home .', 'he\'s calm .']
 fras = ['va !', 'j\'ai perdu .', 'je suis chez moi .', 'il est calme .']
-translate(engs, fras, model, src_vocab, tgt_vocab, num_steps, device)
+#%%
+output_seqs = translate(engs, fras, model, src_vocab, tgt_vocab, num_steps, device)
 # %%
+for output in output_seqs:
+    print(output)
